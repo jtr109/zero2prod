@@ -10,6 +10,7 @@ DB_PASSWORD="${POSTGRES_PASSWORD:=password}"
 DB_NAME="${POSTGRES_DB:=newsletter}"
 # Check if a custom port has been set, otherwise default to'5432'
 DB_PORT="${POSTGRES_PORT:=5432}"
+DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}
 
 if [[ -z "${SKIP_DOCKER}" ]]
 then
@@ -24,8 +25,8 @@ then
         # ^ Increased maximum number of connections for testing purposes
 fi
 
+
 # Keep pinging Postgres until it's ready to accept commands
-export DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}
 until sqlx database create; do
     >&2 echo "Postgres is still unavailable - sleeping"
     sleep 1
