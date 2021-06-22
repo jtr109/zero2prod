@@ -53,6 +53,15 @@ jobs:
   coverage:
     name: Code coverage
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:12
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -62,6 +71,12 @@ jobs:
         with:
           toolchain: stable
           override: true
+
+      - name: Migrate database
+        run: |
+          sudo apt-get install libpq-dev -y
+          cargo install --version=0.5.5 sqlx-cli --no-default-features --features postgres
+          SKIP_DOCKER=true ./scripts/init_db.sh
 
       - name: Run cargo-tarpaulin
         uses: actions-rs/tarpaulin@v0.1
