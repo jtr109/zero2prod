@@ -1,4 +1,5 @@
 use sqlx::{Connection, PgConnection};
+// #doubt don't know why importing struct Connection can make PgConnection::connect available
 use std::net::TcpListener;
 use zero2prod::{configuration::get_configuration, startup::run};
 
