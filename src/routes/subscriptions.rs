@@ -14,7 +14,6 @@ pub async fn subscribe(
     form: web::Form<FormData>,
     pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, HttpResponse> {
-    println!("pool in subscription: {:?}", pool);
     sqlx::query!(
         r#"
         INSERT INTO subscriptions (id, email, name, subscribed_at)
@@ -31,6 +30,5 @@ pub async fn subscribe(
         eprintln!("Failed to execute query: {}", e);
         HttpResponse::InternalServerError().finish()
     })?;
-    println!("insert passed");
     Ok(HttpResponse::Ok().finish())
 }
