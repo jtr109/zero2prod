@@ -1,2 +1,6 @@
-/target
-/.git
+/.git/
+/Dockerfile
+/migrations/
+/scripts/
+/target/
+/tests/
