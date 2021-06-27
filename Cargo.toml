@@ -27,6 +27,7 @@ tracing-log = "0.1.2"
 tracing-actix-web = "0.4.0-beta.4"
 serde-aux = "2.2.0"
 unicode-segmentation = "1.7.1"
+validator = "0.13.0"
 
 [dependencies.sqlx]
 version = "0.5.5"
