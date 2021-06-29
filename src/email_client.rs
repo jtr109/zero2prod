@@ -1,20 +1,21 @@
-use reqwest::Client;
+use reqwest::{Client, Url};
 
 use crate::domain::SubscriberEmail;
 
 pub struct EmailClient {
     http_client: Client,
-    base_url: String,
+    base_url: Url,
     sender: SubscriberEmail,
 }
 
 impl EmailClient {
-    pub fn new(base_url: String, sender: SubscriberEmail) -> Self {
-        Self {
+    pub fn new(base_url: String, sender: SubscriberEmail) -> Result<Self, String> {
+        Ok(Self {
             http_client: Client::new(),
-            base_url,
+            base_url: Url::parse(&base_url)
+                .map_err(|_| format!("`{}` is an invalid base url", base_url))?,
             sender,
-        }
+        })
     }
 
     pub async fn send_email(
@@ -24,8 +25,30 @@ impl EmailClient {
         html_content: &str,
         text_content: &str,
     ) -> Result<(), String> {
+        let path = "/email";
+        let url = self
+            .base_url
+            .join(path)
+            .map_err(|_| format!("cannot join {} and {}", self.base_url, path))?;
+        let request_body = SendEmailRequest {
+            from: self.sender.as_ref().to_owned(),
+            to: recipient.as_ref().to_owned(),
+            subject: subject.to_owned(),
+            html_body: html_content.to_owned(),
+            text_body: text_content.to_owned(),
+        };
+        let builder = self.http_client.post(url).json(&request_body);
         Ok(())
     }
+}
+
+#[derive(serde::Serialize)]
+struct SendEmailRequest {
+    from: String,
+    to: String,
+    subject: String,
+    html_body: String,
+    text_body: String,
 }
 
 #[cfg(test)]
