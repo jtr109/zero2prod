@@ -1,3 +1,4 @@
+use reqwest::Url;
 use serde_aux::field_attributes::deserialize_number_from_string;
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
 use std::convert::{TryFrom, TryInto};
@@ -21,6 +22,10 @@ pub struct EmailClientSettings {
 impl EmailClientSettings {
     pub fn sender(&self) -> Result<SubscriberEmail, String> {
         SubscriberEmail::parse(self.sender_email.clone())
+    }
+
+    pub fn parse_base_url(&self) -> Result<Url, String> {
+        Url::parse(&self.base_url).map_err(|_| format!("{} is an invalid base URL", self.base_url))
     }
 }
 

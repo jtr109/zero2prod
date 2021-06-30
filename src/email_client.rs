@@ -1,16 +1,16 @@
-use reqwest::Client;
+use reqwest::{Client, Url};
 
 use crate::domain::SubscriberEmail;
 
 pub struct EmailClient {
     http_client: Client,
-    base_url: String,
+    base_url: Url,
     sender: SubscriberEmail,
     authorization_token: String,
 }
 
 impl EmailClient {
-    pub fn new(base_url: String, sender: SubscriberEmail, authorization_token: String) -> Self {
+    pub fn new(base_url: Url, sender: SubscriberEmail, authorization_token: String) -> Self {
         Self {
             http_client: Client::new(),
             base_url,
@@ -25,8 +25,12 @@ impl EmailClient {
         subject: &str,
         html_content: &str,
         text_content: &str,
-    ) -> Result<(), reqwest::Error> {
-        let url = format!("{}/email", self.base_url);
+    ) -> Result<(), String> {
+        let path = "/email";
+        let url = self
+            .base_url
+            .join(path)
+            .map_err(|_| format!("cannot join {} with {}", self.base_url, path))?;
         let request_body = SendEmailRequest {
             from: self.sender.as_ref().to_owned(),
             to: recipient.as_ref().to_owned(),
@@ -39,7 +43,8 @@ impl EmailClient {
             .header("X-Postmark-Server-Token", &self.authorization_token)
             .json(&request_body)
             .send()
-            .await?;
+            .await
+            .map_err(|e| format!("cannot send email because {}", e.to_string()))?;
         Ok(())
     }
 }
@@ -60,6 +65,7 @@ mod tests {
     use fake::faker::internet::en::SafeEmail;
     use fake::faker::lorem::en::{Paragraph, Sentence};
     use fake::{Fake, Faker};
+    use reqwest::Url;
     use wiremock::matchers::any;
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -67,7 +73,8 @@ mod tests {
     async fn send_email_fires_a_request_to_base_url() {
         let mock_server = MockServer::start().await;
         let sender = SubscriberEmail::parse(SafeEmail().fake()).unwrap();
-        let email_client = EmailClient::new(mock_server.uri(), sender, Faker.fake());
+        let base_url = Url::parse(&mock_server.uri()).unwrap();
+        let email_client = EmailClient::new(base_url, sender, Faker.fake());
 
         Mock::given(any())
             .respond_with(ResponseTemplate::new(200))
