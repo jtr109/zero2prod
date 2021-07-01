@@ -1,4 +1,4 @@
-use crate::configuration::Settings;
+use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
 use crate::routes::{health_check, subscribe};
 use actix_web::dev::Server;
@@ -29,29 +29,53 @@ pub fn run(
     Ok(server)
 }
 
-pub async fn build(configuration: Settings) -> Result<Server, std::io::Error> {
-    let connection_pool = PgPoolOptions::new()
+pub async fn get_connection_pool(
+    configuration: &DatabaseSettings,
+) -> Result<sqlx::Pool<sqlx::Postgres>, sqlx::Error> {
+    PgPoolOptions::new()
         .connect_timeout(std::time::Duration::from_secs(2))
-        .connect_with(configuration.database.with_db())
+        .connect_with(configuration.with_db())
         .await
-        .expect("Failed to connect to Postgres.");
-    let sender_email = configuration
-        .email_client
-        .sender()
-        .expect("Invalid sender email address.");
-    let base_url = configuration
-        .email_client
-        .parse_base_url()
-        .expect("Invalid base URL");
-    let email_client = EmailClient::new(
-        base_url,
-        sender_email,
-        configuration.email_client.authorization_token,
-    );
-    let address = format!(
-        "{}:{}",
-        configuration.application.host, configuration.application.port
-    );
-    let listener = TcpListener::bind(address)?;
-    run(listener, connection_pool, email_client)
+}
+
+pub struct Application {
+    port: u16,
+    server: Server,
+}
+
+impl Application {
+    pub async fn build(configuration: Settings) -> Result<Self, std::io::Error> {
+        let connection_pool = get_connection_pool(&configuration.database)
+            .await
+            .expect("Failed to connect to Postgres.");
+        let sender_email = configuration
+            .email_client
+            .sender()
+            .expect("Invalid sender email address.");
+        let base_url = configuration
+            .email_client
+            .parse_base_url()
+            .expect("Invalid base URL");
+        let email_client = EmailClient::new(
+            base_url,
+            sender_email,
+            configuration.email_client.authorization_token.clone(),
+        );
+        let address = format!(
+            "{}:{}",
+            configuration.application.host, configuration.application.port
+        );
+        let listener = TcpListener::bind(address)?;
+        let port = listener.local_addr().unwrap().port();
+        let server = run(listener, connection_pool, email_client)?;
+        Ok(Self { port, server })
+    }
+
+    pub fn port(&self) -> u16 {
+        self.port
+    }
+
+    pub async fn run_util_stopped(self) -> Result<(), std::io::Error> {
+        self.server.await
+    }
 }
