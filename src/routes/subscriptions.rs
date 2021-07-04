@@ -46,12 +46,21 @@ pub async fn subscribe(
     insert_subscriber(&pool, &new_subscriber)
         .await
         .map_err(|_| HttpResponse::InternalServerError().finish())?;
+
+    let confirmation_link = "https://my-api.com/subscriptions/confirm";
     email_client
         .send_email(
             new_subscriber.email,
             "Welcome!",
-            "Welcome to out newsletter!",
-            "Welcome to our newsletter!",
+            &format!(
+                "Welcome to out newsletter!<br />\
+                Click <a href=\"{}\">here</a> to confirm your subscription.",
+                confirmation_link
+            ),
+            &format!(
+                "Welcome to our newsletter!\nVisit {} to confirm your subscription.",
+                confirmation_link
+            ),
         )
         .await
         .map_err(|_| HttpResponse::InternalServerError().finish())?;
