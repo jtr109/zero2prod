@@ -84,7 +84,6 @@ mod tests {
     impl wiremock::Match for SendEmailBodyMatcher {
         fn matches(&self, request: &Request) -> bool {
             let result: Result<serde_json::Value, _> = serde_json::from_slice(&request.body);
-            dbg!(&request.body);
             if let Ok(body) = result {
                 body.get("From").is_some()
                     && body.get("To").is_some()
