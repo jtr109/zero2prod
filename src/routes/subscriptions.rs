@@ -1,5 +1,6 @@
-use std::convert::TryInto;
+use std::{convert::TryInto, fmt::Debug};
 
+use actix_http::ResponseError;
 use actix_web::{web, HttpResponse};
 use chrono::Utc;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
@@ -41,7 +42,7 @@ pub async fn subscribe(
     pool: web::Data<PgPool>,
     email_client: web::Data<EmailClient>,
     base_url: web::Data<ApplicationBaseUrl>,
-) -> Result<HttpResponse, HttpResponse> {
+) -> Result<HttpResponse, actix_web::Error> {
     let new_subscriber = form
         .0
         .try_into()
@@ -54,9 +55,7 @@ pub async fn subscribe(
     let subscriber_id = insert_subscriber(&mut transaction, &new_subscriber)
         .await
         .map_err(|_| HttpResponse::InternalServerError().finish())?;
-    store_token(&mut transaction, subscriber_id, &subscription_token)
-        .await
-        .map_err(|_| HttpResponse::InternalServerError().finish())?;
+    store_token(&mut transaction, subscriber_id, &subscription_token).await?;
     transaction
         .commit()
         .await
@@ -81,7 +80,7 @@ pub async fn store_token(
     transaction: &mut Transaction<'_, Postgres>,
     subscriber_id: Uuid,
     subscription_token: &str,
-) -> Result<(), sqlx::Error> {
+) -> Result<(), StoreTokenError> {
     sqlx::query!(
         r#"INSERT INTO subscription_tokens (subscription_token, subscriber_id)
         VALUES ($1, $2)"#,
@@ -92,8 +91,47 @@ pub async fn store_token(
     .await
     .map_err(|e| {
         tracing::error!("Failed to execute query: {:?}", e);
-        e
+        StoreTokenError(e)
     })?;
+    Ok(())
+}
+
+pub struct StoreTokenError(sqlx::Error);
+
+impl ResponseError for StoreTokenError {}
+
+impl std::fmt::Display for StoreTokenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "A database error was encountered while \
+            trying to store a subscription token."
+        )
+    }
+}
+
+impl std::error::Error for StoreTokenError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.0)
+    }
+}
+
+impl Debug for StoreTokenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        error_chain_fmt(self, f)
+    }
+}
+
+fn error_chain_fmt(
+    e: &impl std::error::Error,
+    f: &mut std::fmt::Formatter<'_>,
+) -> std::fmt::Result {
+    writeln!(f, "{}\n", e)?;
+    let mut current = e.source();
+    while let Some(cause) = current {
+        writeln!(f, "Caused by:\n\t{}", cause)?;
+        current = cause.source();
+    }
     Ok(())
 }
 
