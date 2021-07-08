@@ -1,16 +1,16 @@
-use reqwest::{Client, Url};
+use reqwest::Client;
 
 use crate::domain::SubscriberEmail;
 
 pub struct EmailClient {
     http_client: Client,
-    base_url: Url,
+    base_url: String,
     sender: SubscriberEmail,
     authorization_token: String,
 }
 
 impl EmailClient {
-    pub fn new(base_url: Url, sender: SubscriberEmail, authorization_token: String) -> Self {
+    pub fn new(base_url: String, sender: SubscriberEmail, authorization_token: String) -> Self {
         let http_client = Client::builder()
             .timeout(std::time::Duration::from_secs(10))
             .build()
@@ -29,12 +29,9 @@ impl EmailClient {
         subject: &str,
         html_content: &str,
         text_content: &str,
-    ) -> Result<(), String> {
+    ) -> Result<(), reqwest::Error> {
         let path = "/email";
-        let url = self
-            .base_url
-            .join(path)
-            .map_err(|_| format!("cannot join {} with {}", self.base_url, path))?;
+        let url = format!("{}{}", self.base_url, path);
         let request_body = SendEmailRequest {
             from: self.sender.as_ref(),
             to: recipient.as_ref(),
@@ -47,10 +44,8 @@ impl EmailClient {
             .header("X-Postmark-Server-Token", &self.authorization_token)
             .json(&request_body)
             .send()
-            .await
-            .map_err(|e| format!("cannot send email because {}", e.to_string()))?
-            .error_for_status()
-            .map_err(|e| format!("unexpected status code {}", e))?;
+            .await?
+            .error_for_status()?;
         Ok(())
     }
 }
@@ -74,7 +69,6 @@ mod tests {
     use fake::faker::internet::en::SafeEmail;
     use fake::faker::lorem::en::{Paragraph, Sentence};
     use fake::{Fake, Faker};
-    use reqwest::Url;
     use wiremock::matchers::{any, header, header_exists, method, path};
     use wiremock::Request;
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -113,7 +107,6 @@ mod tests {
 
     /// Get a test instance of `EmailClient`
     fn email_client(base_url: String) -> EmailClient {
-        let base_url = Url::parse(&base_url).unwrap();
         EmailClient::new(base_url, email(), Faker.fake())
     }
 

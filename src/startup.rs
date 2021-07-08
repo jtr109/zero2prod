@@ -57,10 +57,7 @@ impl Application {
             .email_client
             .sender()
             .expect("Invalid sender email address.");
-        let base_url = configuration
-            .email_client
-            .parse_base_url()
-            .expect("Invalid base URL");
+        let base_url = configuration.email_client.base_url;
         let email_client = EmailClient::new(
             base_url,
             sender_email,
